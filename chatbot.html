@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Peça Ajuda - Chatbot</title>
+<style>
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: Arial, Helvetica, sans-serif;
+    background: #eaf2ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.chat-box {
+    width: min(850px, 100%);
+    background: white;
+    border-radius: 23px;
+    overflow: hidden;
+    box-shadow: 0 20px 50px rgba(15,23,42,.12);
+    border: 1px solid #dbe3ef;
+}
+.chat-header {
+    background: #2563eb;
+    color: white;
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.chat-avatar {
+    width: 48px; height: 48px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,.18);
+    border-radius: 14px;
+    font-size: 23px;
+}
+.chat-info { flex: 1; }
+.chat-info strong { display:block; font-size:15px; }
+.chat-info span { display:block; margin-top:4px; font-size:11px; }
+.green-dot {
+    display:inline-block; width:7px; height:7px;
+    border-radius:50%; background:#22c55e; margin-right:4px;
+}
+.clear-button {
+    width:40px; height:40px; border:0; border-radius:10px;
+    background:rgba(255,255,255,.15); color:white;
+    cursor:pointer; font-size:20px;
+}
+.messages {
+    height: 500px;
+    overflow-y: auto;
+    padding: 22px;
+    background: #f8fafc;
+}
+.message { display:flex; margin-bottom:16px; }
+.message.bot { justify-content:flex-start; }
+.message.user { justify-content:flex-end; }
+.bubble {
+    max-width:78%; padding:14px 16px; border-radius:17px;
+    font-size:14px; line-height:1.55;
+}
+.message.bot .bubble {
+    background:white; border:1px solid #e2e8f0;
+    border-bottom-left-radius:5px;
+}
+.message.user .bubble {
+    background:#2563eb; color:white;
+    border-bottom-right-radius:5px;
+}
+.bubble-action {
+    margin-top:12px; display:inline-block; border:0;
+    background:#2563eb; color:white; padding:9px 12px;
+    border-radius:9px; cursor:pointer; font-weight:bold;
+}
+.quick-actions {
+    display:flex; flex-wrap:wrap; gap:8px;
+    padding:14px; border-top:1px solid #e2e8f0;
+}
+.quick-actions button {
+    border:1px solid #bfdbfe; background:#eff6ff; color:#2563eb;
+    padding:9px 12px; border-radius:20px; font-size:12px;
+    font-weight:bold; cursor:pointer;
+}
+.input-area {
+    display:flex; gap:10px; padding:15px;
+    border-top:1px solid #e2e8f0;
+}
+#userInput {
+    flex:1; min-width:0; border:1px solid #cbd5e1;
+    border-radius:12px; padding:14px; outline:none; font-size:14px;
+}
+#userInput:focus {
+    border-color:#2563eb;
+    box-shadow:0 0 0 3px rgba(37,99,235,.1);
+}
+.send-button {
+    width:52px; border:0; border-radius:12px;
+    background:#2563eb; color:white; font-size:20px; cursor:pointer;
+}
+.typing { display:flex; gap:4px; align-items:center; }
+.typing span {
+    width:6px; height:6px; background:#94a3b8;
+    border-radius:50%; animation:typing 1s infinite;
+}
+.typing span:nth-child(2){animation-delay:.15s}
+.typing span:nth-child(3){animation-delay:.3s}
+@keyframes typing {
+    0%,60%,100%{transform:translateY(0)}
+    30%{transform:translateY(-4px)}
+}
+@media(max-width:600px){
+    body{padding:0}
+    .chat-box{min-height:100vh;border-radius:0}
+    .messages{height:calc(100vh - 190px)}
+    .bubble{max-width:88%}
+}
+</style>
+</head>
+<body>
+<div class="chat-box">
+    <div class="chat-header">
+        <div class="chat-avatar">🤖</div>
+        <div class="chat-info">
+            <strong>Peça Ajuda</strong>
+            <span><span class="green-dot"></span>Assistente disponível</span>
+        </div>
+        <button class="clear-button" id="clearChatButton" title="Limpar conversa">↻</button>
+    </div>
+
+    <div class="messages" id="messages"></div>
+
+    <div class="quick-actions">
+        <button data-question="Preciso encontrar um abrigo">🏠 Abrigo</button>
+        <button data-question="Onde posso conseguir comida?">🍲 Comida</button>
+        <button data-question="Onde posso conseguir roupas?">👕 Roupas</button>
+        <button data-question="Onde posso tomar banho?">🧼 Banho</button>
+        <button data-question="Preciso de atendimento de saúde">🏥 Saúde</button>
+        <button data-question="Quero fazer uma doação">🎁 Doar</button>
+    </div>
+
+    <div class="input-area">
+        <input type="text" id="userInput" placeholder="Digite o que você precisa..." autocomplete="off">
+        <button class="send-button" id="sendButton">➤</button>
+    </div>
+</div>
+
+<script>
+        const messages =
+            document.getElementById("messages");
+
+        const userInput =
+            document.getElementById("userInput");
+
+        const sendButton =
+            document.getElementById("sendButton");
+
+        const startChatButton =
+            document.getElementById("startChatButton");
+
+        const locationButton =
+            document.getElementById("locationButton");
+
+        const clearChatButton =
+            document.getElementById("clearChatButton");
+
+
+
+        /* MENSAGEM INICIAL */
+
+        const mensagemInicial = `
+
+            Olá! 👋
+
+            <br><br>
+
+            Eu sou o <strong>Peça Ajuda</strong>.
+
+            <br><br>
+
+            Posso conversar com você e orientar sobre:
+
+            <br><br>
+
+            🏠 Abrigos
+
+            <br>
+
+            🍲 Alimentação
+
+            <br>
+
+            👕 Roupas e cobertores
+
+            <br>
+
+            🧼 Higiene e banho
+
+            <br>
+
+            🏥 Saúde
+
+            <br>
+
+            🪪 Documentos
+
+            <br>
+
+            🎁 Doações
+
+            <br><br>
+
+            Escreva o que você precisa.
+
+        `;
+
+
+
+        /* ADICIONAR MENSAGEM */
+
+        function adicionarMensagem(texto, tipo) {
+
+
+            const message =
+                document.createElement("div");
+
+
+            message.className =
+                "message " + tipo;
+
+
+            const bubble =
+                document.createElement("div");
+
+
+            bubble.className =
+                "bubble";
+
+
+            bubble.innerHTML =
+                texto;
+
+
+            message.appendChild(
+                bubble
+            );
+
+
+            messages.appendChild(
+                message
+            );
+
+
+            messages.scrollTop =
+                messages.scrollHeight;
+
+        }
+
+
+
+        /* DIGITANDO */
+
+        function mostrarDigitando() {
+
+
+            const message =
+                document.createElement("div");
+
+
+            message.className =
+                "message bot";
+
+
+            message.id =
+                "typingMessage";
+
+
+            const bubble =
+                document.createElement("div");
+
+
+            bubble.className =
+                "bubble";
+
+
+            bubble.innerHTML = `
+
+                <div class="typing">
+
+                    <span></span>
+                    <span></span>
+                    <span></span>
+
+                </div>
+
+            `;
+
+
+            message.appendChild(
+                bubble
+            );
+
+
+            messages.appendChild(
+                message
+            );
+
+
+            messages.scrollTop =
+                messages.scrollHeight;
+
+        }
+
+
+
+        /* REMOVER DIGITANDO */
+
+        function removerDigitando() {
+
+            const typing =
+                document.getElementById(
+                    "typingMessage"
+                );
+
+
+            if (typing) {
+
+                typing.remove();
+
+            }
+
+        }
+
+
+
+        /* ENVIAR MENSAGEM */
+
+        function enviarMensagem() {
+
+
+            const texto =
+                userInput.value.trim();
+
+
+            if (texto === "") {
+
+                return;
+
+            }
+
+
+            adicionarMensagem(
+                texto,
+                "user"
+            );
+
+
+            userInput.value =
+                "";
+
+
+            sendButton.disabled =
+                true;
+
+
+            mostrarDigitando();
+
+
+            setTimeout(
+                function() {
+
+
+                    removerDigitando();
+
+
+                    const resposta =
+                        gerarResposta(texto);
+
+
+                    adicionarMensagem(
+                        resposta,
+                        "bot"
+                    );
+
+
+                    sendButton.disabled =
+                        false;
+
+
+                    userInput.focus();
+
+
+                },
+                700
+            );
+
+        }
+
+
+
+        /* BOTÃO ENVIAR */
+
+        sendButton.addEventListener(
+            "click",
+            enviarMensagem
+        );
+
+
+
+        /* ENTER */
+
+        userInput.addEventListener(
+            "keydown",
+            function(event) {
+
+
+                if (
+                    event.key === "Enter"
+                ) {
+
+
+                    event.preventDefault();
+
+
+                    enviarMensagem();
+
+                }
+
+            }
+        );
+
+
+
+        /* ABRIR CHAT */
+
+        function abrirChat() {
+
+
+            document
+                .getElementById("chat")
+                .scrollIntoView({
+                    behavior: "smooth"
+                });
+
+
+            setTimeout(
+                function() {
+
+                    userInput.focus();
+
+                },
+                500
+            );
+
+        }
+
+
+
+        /* BOTÃO DO HERO */
+
+        startChatButton.addEventListener(
+            "click",
+            abrirChat
+        );
+
+
+
+        /* BOTÕES DE SERVIÇO */
+
+        const serviceButtons =
+            document.querySelectorAll(
+                ".service-card"
+            );
+
+
+        serviceButtons.forEach(
+            function(button) {
+
+
+                button.addEventListener(
+                    "click",
+                    function() {
+
+
+                        const pergunta =
+                            button.dataset.question;
+
+
+                        abrirChat();
+
+
+                        setTimeout(
+                            function() {
+
+                                enviarPergunta(
+                                    pergunta
+                                );
+
+                            },
+                            500
+                        );
+
+                    }
+                );
+
+            }
+        );
+
+
+
+        /* BOTÕES RÁPIDOS */
+
+        const quickButtons =
+            document.querySelectorAll(
+                ".quick-actions button"
+            );
+
+
+        quickButtons.forEach(
+            function(button) {
+
+
+                button.addEventListener(
+                    "click",
+                    function() {
+
+
+                        const pergunta =
+                            button.dataset.question;
+
+
+                        enviarPergunta(
+                            pergunta
+                        );
+
+                    }
+                );
+
+            }
+        );
+
+
+
+        /* ENVIAR PERGUNTA */
+
+        function enviarPergunta(
+            pergunta
+        ) {
+
+
+            userInput.value =
+                pergunta;
+
+
+            enviarMensagem();
+
+        }
+
+
+
+        /* LIMPAR CHAT */
+
+        clearChatButton.addEventListener(
+            "click",
+            function() {
+
+
+                messages.innerHTML =
+                    "";
+
+
+                adicionarMensagem(
+                    mensagemInicial,
+                    "bot"
+                );
+
+
+                userInput.focus();
+
+            }
+        );
+
+
+
+        /* =========================
+           INTELIGÊNCIA DO CHATBOT
+        ========================= */
+
+        function gerarResposta(texto) {
+
+
+            const mensagem =
+                texto
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(
+                    /[\u0300-\u036f]/g,
+                    ""
+                );
+
+
+
+            /* SAUDAÇÕES */
+
+            if (
+
+                mensagem.includes("oi") ||
+                mensagem.includes("ola") ||
+                mensagem.includes("bom dia") ||
+                mensagem.includes("boa tarde") ||
+                mensagem.includes("boa noite")
+
+            ) {
+
+
+                return `
+
+                    Olá! 😊
+
+                    <br><br>
+
+                    Estou aqui para ajudar.
+
+                    <br><br>
+
+                    Você pode perguntar sobre
+                    <strong>abrigo, comida, roupas,
+                    higiene, saúde, documentos
+                    ou doações.</strong>
+
+                    <br><br>
+
+                    O que você precisa?
+
+                `;
+
+            }
+
+
+
+            /* ABRIGO */
+
+            if (
+
+                mensagem.includes("abrigo") ||
+                mensagem.includes("dormir") ||
+                mensagem.includes("dormida") ||
+                mensagem.includes("onde ficar") ||
+                mensagem.includes("lugar para ficar") ||
+                mensagem.includes("acolhimento") ||
+                mensagem.includes("casa de passagem")
+
+            ) {
+
+
+                return `
+
+                    Entendi. Você está procurando
+                    <strong>um lugar para ficar
+                    ou passar a noite.</strong>
+
+                    <br><br>
+
+                    Você pode procurar por:
+
+                    <br>
+
+                    🏠 Abrigos
+
+                    <br>
+
+                    🏠 Casas de passagem
+
+                    <br>
+
+                    🏠 Serviços de acolhimento
+
+                    <br><br>
+
+                    Se você me disser sua cidade,
+                    posso orientar melhor sobre
+                    como procurar.
+
+                    <br><br>
+
+                    <button
+                        class="bubble-action"
+                        onclick="buscarNoMapa('abrigo e assistência social')">
+
+                        📍 Procurar no mapa
+
+                    </button>
+
+                `;
+
+            }
+
+
+
+            /* COMIDA */
+
+            if (
+
+                mensagem.includes("comida") ||
+                mensagem.includes("comer") ||
+                mensagem.includes("fome") ||
+                mensagem.includes("alimentacao") ||
+                mensagem.includes("alimento") ||
+                mensagem.includes("refeicao") ||
+                mensagem.includes("refeicoes")
+
+            ) {
+
+
+                return `
+
+                    Claro. Para encontrar alimentação,
+                    procure por serviços como:
+
+                    <br><br>
+
+                    🍲 Restaurante Popular
+
+                    <br>
+
+                    🍲 Cozinha comunitária
+
+                    <br>
+
+                    🍲 Centros de acolhimento
+
+                    <br>
+
+                    🍲 Projetos de alimentação solidária
+
+                    <br><br>
+
+                    Também posso ajudar a procurar
+                    no mapa.
+
+                    <br><br>
+
+                    <button
+                        class="bubble-action"
+                        onclick="buscarNoMapa('Restaurante Popular')">
+
+                        📍 Procurar alimentação
+
+                    </button>
+
+                `;
+
+            }
+
+
+
+            /* ROUPAS */
+
+            if (
+
+                mensagem.includes("roupa") ||
+                mensagem.includes("roupas") ||
+                mensagem.includes("agasalho") ||
+                mensagem.includes("cobertor") ||
+                mensagem.includes("vestimenta")
+
+            ) {
+
+
+                return `
+
+                    Para conseguir roupas ou cobertores,
+                    você pode procurar:
+
+                    <br><br>
+
+                    👕 Campanhas do agasalho
+
+                    <br>
+
+                    👕 Pontos de doação
+
+                    <br>
+
+                    👕 Organizações sociais
+
+                    <br>
+
+                    👕 Centros comunitários
+
+                    <br><br>
+
+                    <button
+                        class="bubble-action"
+                        onclick="buscarNoMapa('doação de roupas')">
+
+                        📍 Procurar doações
+
+                    </button>
+
+                `;
+
+            }
+
+
+
+            /* HIGIENE */
+
+            if (
+
+                mensagem.includes("banho") ||
+                mensagem.includes("higiene") ||
+                mensagem.includes("sabonete") ||
+                mensagem.includes("escovar") ||
+                mensagem.includes("toalha") ||
+                mensagem.includes("chuveiro")
+
+            ) {
+
+
+                return `
+
+                    Para higiene e banho,
+                    procure por <strong>centros
+                    de acolhimento, serviços sociais
+                    e projetos comunitários.</strong>
+
+                    <br><br>
+
+                    Alguns locais podem oferecer
+                    banho, kits de higiene e outros
+                    cuidados básicos.
+
+                    <br><br>
+
+                    <button
+                        class="bubble-action"
+                        onclick="buscarNoMapa('centro de acolhimento banho')">
+
+                        📍 Procurar locais
+
+                    </button>
+
+                `;
+
+            }
+
+
+
+            /* SAÚDE */
+
+            if (
+
+                mensagem.includes("saude") ||
+                mensagem.includes("medico") ||
+                mensagem.includes("hospital") ||
+                mensagem.includes("upa") ||
+                mensagem.includes("ubs") ||
+                mensagem.includes("doente") ||
+                mensagem.includes("machucado") ||
+                mensagem.includes("ferimento")
+
+            ) {
+
+
+                return `
+
+                    Para atendimento de saúde,
+                    você pode procurar uma
+                    <strong>UBS, UPA ou serviço
+                    público de saúde.</strong>
+
+                    <br><br>
+
+                    Se houver uma situação grave
+                    ou risco imediato à vida,
+                    procure atendimento de
+                    emergência.
+
+                    <br><br>
+
+                    <button
+                        class="bubble-action"
+                        onclick="buscarNoMapa('UBS unidade básica de saúde')">
+
+                        📍 Procurar UBS
+
+                    </button>
+
+                `;
+
+            }
+
+
+
+            /* DOCUMENTOS */
+
+            if (
+
+                mensagem.includes("documento") ||
+                mensagem.includes("documentos") ||
+                mensagem.includes("cpf") ||
+                mensagem.includes("rg") ||
+                mensagem.includes("identidade") ||
+                mensagem.includes("certidao")
+
+            ) {
+
+
+                return `
+
+                    Entendi. Para conseguir orientação
+                    sobre documentos, você pode procurar:
+
+                    <br><br>
+
+                    🪪 CRAS
+
+                    <br>
+
+                    🪪 Centros de atendimento ao cidadão
+
+                    <br>
+
+                    🪪 Serviços de assistência social
+
+                    <br>
+
+                    🪪 Órgãos públicos de documentação
+
+                    <br><br>
+
+                    <button
+                        class="bubble-action"
+                        onclick="buscarNoMapa('CRAS assistência social')">
+
+                        📍 Procurar CRAS
+
+                    </button>
+
+                `;
+
+            }
+
+
+
+            /* DOAÇÃO */
+
+            if (
+
+                mensagem.includes("doar") ||
+                mensagem.includes("doacao") ||
+                mensagem.includes("doacoes") ||
+                mensagem.includes("ajudar pessoas") ||
+                mensagem.includes("quero ajudar")
+
+            ) {
+
+
+                return `
+
+                    Que bom que você quer ajudar! 💙
+
+                    <br><br>
+
+                    Algumas formas de contribuir são:
+
+                    <br><br>
+
+                    👕 Roupas em bom estado
+
+                    <br>
+
+                    🛏️ Cobertores
+
+                    <br>
+
+                    🧼 Produtos de higiene
+
+                    <br>
+
+                    🍚 Alimentos
+
+                    <br>
+
+                    🤝 Trabalho voluntário
+
+                    <br><br>
+
+                    Antes de doar, procure uma
+                    organização confiável e pergunte
+                    quais itens ela realmente precisa.
+
+                    <br><br>
+
+                    <button
+                        class="bubble-action"
+                        onclick="buscarNoMapa('ponto de doação')">
+
+                        📍 Procurar ponto de doação
+
+                    </button>
+
+                `;
+
+            }
+
+
+
+            /* LOCALIZAÇÃO */
+
+            if (
+
+                mensagem.includes("perto de mim") ||
+                mensagem.includes("perto") ||
+                mensagem.includes("localizacao")
+
+            ) {
+
+
+                return `
+
+                    Posso tentar encontrar serviços
+                    próximos usando a localização
+                    do seu navegador.
+
+                    <br><br>
+
+                    <button
+                        class="bubble-action"
+                        onclick="localizarAjuda()">
+
+                        📍 Usar minha localização
+
+                    </button>
+
+                `;
+
+            }
+
+
+
+            /* AGRADECIMENTO */
+
+            if (
+
+                mensagem.includes("obrigado") ||
+                mensagem.includes("obrigada") ||
+                mensagem.includes("valeu")
+
+            ) {
+
+
+                return `
+
+                    Por nada! 💙
+
+                    <br><br>
+
+                    Espero que o Peça Ajuda consiga
+                    facilitar o acesso à informação.
+
+                    <br><br>
+
+                    Se precisar de outra coisa,
+                    pode perguntar.
+
+                `;
+
+            }
+
+
+
+            /* RESPOSTA PADRÃO */
+
+            return `
+
+                Quero ajudar, mas não consegui
+                identificar exatamente o que
+                você precisa.
+
+                <br><br>
+
+                Você pode escrever de outra maneira.
+
+                <br><br>
+
+                🏠 "Preciso de um lugar para dormir"
+
+                <br>
+
+                🍲 "Estou com fome"
+
+                <br>
+
+                👕 "Preciso de roupas"
+
+                <br>
+
+                🧼 "Onde posso tomar banho?"
+
+                <br>
+
+                🏥 "Preciso de atendimento médico"
+
+                <br>
+
+                🪪 "Preciso tirar meus documentos"
+
+                <br>
+
+                🎁 "Quero ajudar alguém"
+
+            `;
+
+        }
+
+
+
+        /* =========================
+           GOOGLE MAPS
+        ========================= */
+
+        function buscarNoMapa(
+            pesquisa
+        ) {
+
+
+            const url =
+                "https://www.google.com/maps/search/" +
+                encodeURIComponent(
+                    pesquisa
+                );
+
+
+            window.open(
+                url,
+                "_blank"
+            );
+
+        }
+
+
+
+        /* =========================
+           LOCALIZAÇÃO
+        ========================= */
+
+        function localizarAjuda() {
+
+
+            if (
+                !navigator.geolocation
+            ) {
+
+
+                adicionarMensagem(
+                    `
+                    Seu navegador não permite
+                    acessar a localização.
+
+                    <br><br>
+
+                    Você pode procurar manualmente
+                    pelo nome da sua cidade.
+                    `,
+                    "bot"
+                );
+
+
+                abrirChat();
+
+
+                return;
+
+            }
+
+
+            adicionarMensagem(
+                "📍 Vou tentar encontrar serviços próximos de você...",
+                "bot"
+            );
+
+
+            navigator.geolocation.getCurrentPosition(
+
+                function(position) {
+
+
+                    const latitude =
+                        position.coords.latitude;
+
+
+                    const longitude =
+                        position.coords.longitude;
+
+
+                    const url =
+                        "https://www.google.com/maps/search/abrigo+assistência+social/@" +
+                        latitude +
+                        "," +
+                        longitude +
+                        ",14z";
+
+
+                    adicionarMensagem(
+                        `
+                        Encontrei sua localização aproximada.
+
+                        <br><br>
+
+                        Clique abaixo para procurar
+                        <strong>abrigos e serviços de
+                        assistência próximos de você.</strong>
+
+                        <br><br>
+
+                        <button
+                            class="bubble-action"
+                            onclick="window.open('${url}', '_blank')">
+
+                            📍 Abrir mapa
+
+                        </button>
+                        `,
+                        "bot"
+                    );
+
+                },
+
+
+                function() {
+
+
+                    adicionarMensagem(
+                        `
+                        Não consegui acessar sua localização.
+
+                        <br><br>
+
+                        Isso pode acontecer se o navegador
+                        não tiver permissão para acessar
+                        sua localização.
+
+                        <br><br>
+
+                        Você pode continuar usando o chatbot
+                        normalmente e procurar pelo nome
+                        da cidade.
+                        `,
+                        "bot"
+                    );
+
+                }
+
+            );
+
+        }
+
+
+
+        /* BOTÃO DE LOCALIZAÇÃO */
+
+        locationButton.addEventListener(
+            "click",
+            function() {
+
+                abrirChat();
+
+                setTimeout(
+                    localizarAjuda,
+                    500
+                );
+
+            }
+        );
+
+
+
+        /* MENSAGEM INICIAL */
+
+        adicionarMensagem(
+            mensagemInicial,
+            "bot"
+        );
+
+
+
+</script>
+</body>
+</html>
